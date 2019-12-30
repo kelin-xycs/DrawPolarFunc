@@ -1,0 +1,570 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>极坐标系 隐函数 数值求解 并 绘制 函数图像</title>
+    <script type="text/javascript">
+
+        var _x1;
+        var _x2;
+        var _xStep;
+
+        var _y0;
+        var _yRatio;
+
+        var _diffAllow;
+
+        var _paras;
+        var _points;
+
+        var _equationLeft, _equationRight;
+
+        var _beginTime;
+
+        var _Pi = 3.1415926;
+
+        var _ox;
+        var _oy;
+
+        function ParsePara(str) {
+
+            var arr = str.split(",");
+
+            if (arr.length < 2)
+                throw "“" + str + "” 中用 逗号 , 隔开的参数只有 " + arr.length + " 个，应该有 步长 步数 2 个参数 。";
+
+            var para = new Object();
+
+            var stepLength = arr[0];
+            var stepCount = arr[1];
+            
+            para.stepLength = parseFloat(stepLength);
+            para.stepCount = parseFloat(stepCount);
+
+            if (isNaN(para.stepLength) || para.stepLength < 0)
+            {
+                throw "“" + stepLength + "” 应是正数 。";
+            }
+            if (isNaN(para.stepCount))
+            {
+                throw "“" + stepCount + "” 应是正数 。";
+            }
+
+
+            return para;
+
+        }
+
+        function btnCalculate_Click() {
+
+            _x1 = parseFloat(document.getElementById("txtX1").value);
+
+            if (isNaN(_x1)) {
+                alert("x 范围 开始值 应填写数字 。");
+                return;
+            }
+
+            _x2 = parseFloat(document.getElementById("txtX2").value);
+
+            if (isNaN(_x2)) {
+                alert("x 范围 结束值 应填写数字 。");
+                return;
+            }
+
+            _xStep = parseFloat(document.getElementById("txtXStep").value);
+
+            if (isNaN(_xStep) || _xStep <= 0) {
+
+                alert("x 步长 应填写正数 。");
+                return;
+            }
+
+            if (_x1 >= _x2) {
+
+                alert("x 范围 开始值 应小于 结束值 。");
+                return;
+            }
+
+            if (_x2 - _x1 < _xStep) {
+
+                alert("x 范围 结束值 和 开始值 的 差 应大于 步长 。");
+                return;
+            }
+
+            _y0 = parseFloat(document.getElementById("txtY0").value);
+
+            if (isNaN(_y0)) {
+                alert("y 初始值 应填写数字 。");
+                return;
+            }
+
+             _diffAllow = parseFloat(document.getElementById("txtDiffAllow").value);
+
+            if (isNaN(_diffAllow) || _diffAllow <= 0) {
+
+                alert("diff 允许值 应填写正数 。");
+                return;
+            }
+
+            var left = document.getElementById("txtLeft").value;
+
+            if (!left) {
+
+                alert("等式左边的函数不能为空 。");
+                return;
+            }
+            
+            var right = document.getElementById("txtRight").value;
+
+            if (!right) {
+
+                alert("等式右边的函数不能为空 。");
+                return;
+            }
+
+            try {
+
+                eval("_equationLeft = " + left);
+            }
+            catch (e) {
+
+                alert("等式左边的函数 错误 ： " + e);
+                return;
+            }
+
+            try {
+
+                eval("_equationRight = " + right);
+            }
+            catch (e) {
+
+                alert("等式右边的函数 错误 ： " + e);
+                return;
+            }
+
+            var paraStr = document.getElementById("txtPara").value;
+
+            var arr = paraStr.split(";");
+
+            _paras = [];
+
+            for (let i = 0; i < arr.length; i++) {
+
+                let str = arr[i].trim();
+
+                if (str == "")
+                    continue;
+
+                try {
+                    _paras[i] = ParsePara(arr[i]);
+                }
+                catch (e) {
+                    alert(e);
+                    return;
+                }
+                
+            }
+
+            var c=document.getElementById("myCanvas");
+            
+            _ox = c.width / 2;
+            _oy = c.height / 2;
+
+            writeMsg("spanStatus", "计算中 ……");
+
+            _beginTime = new Date();
+
+            window.setTimeout(CalculatePoints, 0);
+        }
+
+        function Try(x, y) {
+
+            var a, b;
+
+            try {
+
+                a = _equationLeft(x, y);
+            }
+            catch (e) {
+                throw "等式左边的函数 执行错误 ： " + e;
+            }
+
+            try {
+
+                b = _equationRight(x, y);
+            }
+            catch (e) {
+                throw "等式右边的函数 执行错误 ： " + e;
+            }
+
+
+            var diff = Math.abs(a - b);
+
+            return diff;
+        }
+
+        function Approach(para, x, y) {
+
+            var diff1, diff2, y1, y2, stepCount; 
+
+            diff1 = Try(x, y);
+            y1 = y;
+            stepCount = 0;
+
+            for (let i = 1; i <= para.stepCount; i++) {
+
+                let l = para.stepLength * i;
+
+                y2 = y + l;
+
+                diff2 = Try(x, y2);
+            
+                if (diff2 < diff1) {
+
+                    diff1 = diff2;
+                    y1 = y2;
+                    stepCount = i;
+                }
+
+                y2 = y - l;
+
+                diff2 = Try(x, y2);
+
+                if (diff2 < diff1) {
+
+                    diff1 = diff2;
+                    y1 = y2;
+                    stepCount = -i;
+                }
+            }
+
+
+            return { x: x, y: y1, diff: diff1, stepCount: stepCount };
+
+        }
+
+        function CalculatePoints() {
+
+            var x = _x1;
+
+            var s = "";
+            var exceedDiffCount = 0;
+
+            _points = [];
+
+            try {
+
+                while (x <= _x2) {
+
+                    let result = Calculate(x);
+
+                    _points[_points.length] = { x: result.x, y: result.y };
+
+                    s += result.x + " , " + result.y + " , ";
+
+                    if (result.diff > _diffAllow) {
+
+                        s += "<span style='color: red'>" + result.diff + "</span>";
+
+                        exceedDiffCount++;
+                    }
+                        
+                    else
+                        s += result.diff;
+
+                    s += "<br />";
+
+                    x += _xStep;
+
+                }
+
+            }
+            catch (e) {
+
+                alert(e);
+                writeMsg("spanStatus", "计算异常终止 。 耗时 " + ((new Date().getTime() - _beginTime) / 1000) + "秒 。");
+                return;
+            }
+
+
+            writeMsg("spanStatus", "计算完成 。 耗时 " + ((new Date().getTime() - _beginTime) / 1000) + "秒 。 共计算 " + _points.length + " 个轨迹点 。 " + exceedDiffCount + " 个轨迹点的计算结果超出允许的 diff " + _diffAllow + " 。");
+            writeMsg("spanResult1", s);
+
+        }
+
+        function Calculate(x) {
+
+            
+            var result1, result2;
+
+            var y = _y0;
+
+            
+                for (let i = 0; i < _paras.length; i++) {
+
+                    let para = _paras[i];
+
+                    result2 = Approach(para, x, y);
+
+                    result2.seq = i + 1;
+
+                    if (!result1 || result2.diff < result1.diff) {
+
+                        result1 = result2;
+
+                        y = result2.y;
+                    }
+
+            }
+
+            return result1;
+           
+        }
+
+        function clearCanvas()  
+        {  
+            var c=document.getElementById("myCanvas");
+            var cxt = c.getContext("2d");
+            cxt.clearRect(0, 0, c.width, c.height);  
+        }  
+
+        function btnDraw_Click() {
+
+            if (!_points) {
+
+                alert("先计算轨迹点，再画图 。");
+                return;
+            }
+
+            _yRatio = parseFloat(document.getElementById("txtYRatio").value);
+
+            if (isNaN(_yRatio) || _yRatio <= 0) {
+
+                alert("极径 y 的 缩放倍数 应填写正数 。");
+                return;
+            }
+
+            clearCanvas();
+
+            drawXY();
+
+            var canvas =document.getElementById("myCanvas");
+            var context = canvas.getContext("2d");
+
+            for (let i = 0; i < _points.length; i++) {
+
+                let point = _points[i];
+
+                let y = point.y;
+
+                context.beginPath();
+                context.strokeStyle = "red";
+
+                if (y < 0) {
+
+                    y = Math.abs(y);
+                    context.strokeStyle = "blue";
+                }
+
+                y = y * _yRatio;
+
+                var pp = GetPoint(point.x, y);
+
+                context.strokeRect(pp.x, pp.y, 1, 1);
+            }
+        }
+
+        function btnDrawP_Click() {
+
+
+            if (!_points) {
+
+                alert("先计算轨迹点，再画图 。");
+                return;
+            }
+
+            _yRatio = parseFloat(document.getElementById("txtYRatio").value);
+
+            if (isNaN(_yRatio) || _yRatio <= 0) {
+
+                alert("极径 y 的 缩放倍数 应填写正数 。");
+                return;
+            }
+
+            clearCanvas();
+
+            drawXY();
+
+            var canvas =document.getElementById("myCanvas");
+            var context = canvas.getContext("2d");
+
+            context.beginPath();
+            context.strokeStyle = "red";
+
+            for (let i = 0; i < _points.length; i++) {
+
+                let point = _points[i];
+
+                let y = point.y;
+
+                if (y < 0)
+                    continue;
+
+                y = y * _yRatio;
+
+                var pp = GetPoint(point.x, y);
+
+                context.strokeRect(pp.x, pp.y, 1, 1);
+            }
+        }
+
+        function btnDrawN_Click() {
+
+
+            if (!_points) {
+
+                alert("先计算轨迹点，再画图 。");
+                return;
+            }
+
+            _yRatio = parseFloat(document.getElementById("txtYRatio").value);
+
+            if (isNaN(_yRatio) || _yRatio <= 0) {
+
+                alert("极径 y 的 缩放倍数 应填写正数 。");
+                return;
+            }
+
+            clearCanvas();
+
+            drawXY();
+
+            var canvas =document.getElementById("myCanvas");
+            var context = canvas.getContext("2d");
+
+            context.beginPath();
+            context.strokeStyle = "blue";
+
+            for (let i = 0; i < _points.length; i++) {
+
+                let point = _points[i];
+
+                let y = point.y;
+
+                if (y > 0)
+                    continue;
+
+                y = Math.abs(y);
+                y = y * _yRatio;
+
+                var pp = GetPoint(point.x, y);
+
+                context.strokeRect(pp.x, pp.y, 1, 1);
+            }
+        }
+
+
+        function GetPoint(q, p) {
+
+
+            var x = p * Math.abs(Math.cos(q));
+            var y = p * Math.abs(Math.sin(q));
+
+            if (q <= _Pi / 2) {
+
+                return { "x" : _ox + x, "y" : _oy - y };
+            }
+            
+            q = q - _Pi / 2;
+
+            if (q <= _Pi / 2) {
+                
+                return { "x" : _ox - x, "y" : _oy - y };
+            }
+
+            q = q - _Pi / 2;
+
+            if (q <= _Pi / 2) {
+
+                return { "x" : _ox - x, "y" : _oy + y };
+            }
+
+            q = q - _Pi / 2;
+
+            return { "x" : _ox + x, "y" : _oy + y };
+
+        }
+
+        function drawXY() {
+
+            var c=document.getElementById("myCanvas");
+            var cxt = c.getContext("2d");
+            cxt.beginPath();
+            cxt.moveTo(10, _oy);
+            cxt.lineTo(c.width - 10, _oy);
+            cxt.moveTo(_ox, 10);
+            cxt.lineTo(_ox, c.height - 10);
+            cxt.strokeStyle = "blue";
+            cxt.stroke();
+        }
+
+        function writeMsg(id, msg) {
+
+            var span = document.getElementById(id);
+
+            span.innerHTML = msg;
+        }
+    </script>
+</head>
+<body>
+    本程序 对 极坐标系 隐函数 数值求解 并 绘制 函数图像 。 <br />
+    详细说明 见 《极坐标系 隐函数 数值求解 并 绘制 函数图像》 <a href="https://www.cnblogs.com/KSongKing/p/12109699.html" target="_blank">https://www.cnblogs.com/KSongKing/p/12109699.html</a><br /><br />
+
+    极坐标系 的 自变量 是θ， 因变量 是 ρ， 但为了叙述方便， 在这里 自变量 统称为 x， 因变量 统称为 y 。<br /><br />
+
+    y 初始值 ： <input id="txtY0" value="0" /> 用于 尝试匹配 的 初始值<br /><br />
+
+    隐函数等式左边和右边的表达式分别表示为 2 个 javascript 函数，左边文本框里的 equationLeft(x, y) 表示等式左边， 右边文本框里的 equationRight(x, y) 表示等式右边 。<br />
+    默认给出的这 2 个 javascript 函数 表示 隐函数 y = tan(x + y) 。<br />
+    <textarea id="txtLeft" style="width:500px; height:200px">
+function equationLeft(x, y)
+{
+     return y;
+}
+    </textarea>
+    <textarea id="txtRight" style="width:500px; height:200px">
+function equationRight(x, y)
+{
+    return Math.tan(x + y);
+}
+    </textarea>
+    <br />
+    匹配设定， 每一轮匹配的设定包括 步长 步数， 用逗号“,”隔开， 每轮设定之间用分号“;”隔开
+    <textarea id="txtPara" style="width:1000px; height:40px">100,10; 10,10; 1,10; 0.1,10; 0.01,10; 0.001,10; 0.0001,10; 0.00001,10; 0.000001,10</textarea><br /><br />
+
+    以上是 数值求解 设定 。<br /><br />
+
+    计算 是 计算轨迹点， 先计算轨迹点，后画图 。  计算结果 在 绘图画面 下面 。 正根（y > 0）用红色曲线表示， 负根（y < 0）用蓝色曲线表示 。<br />
+    因为 极径 y 不能取负数， 所以 负根 会先取 绝对值 再画图 。<br /><br />
+
+    x 范围 ： <input id="txtX1" value="0" /> ~ <input id="txtX2" value="6.28" />  弧度<br />
+    x 的 步长 ： <input id="txtXStep" value="0.001" />  取轨迹点的步长，步长越短，轨迹点越密集，函数曲线精度越高 。<br />
+    diff 允许值 ： <input id="txtDiffAllow" value="0.001" /> diff 超过 允许值 时显示为红色警告<br />
+    极径 y 的 缩放倍数 ： <input id="txtYRatio" value="50" /> 倍数 大于 1 则 放大图像， 小于 1 则 缩小图像<br /><br />
+
+    <input type="button" value="计算" onclick="btnCalculate_Click();" style="width: 100px" />
+    <input type="button" value="画图" onclick="btnDraw_Click();" style="width: 100px" />
+    <input type="button" value="画图（正根）" onclick="btnDrawP_Click();" style="width: 100px" />
+    <input type="button" value="画图（负根）" onclick="btnDrawN_Click();" style="width: 100px" />
+
+    <span id="spanStatus"></span><br /><br />
+
+    <canvas id="myCanvas" width="1250" height="1000" style="border: 1px solid;"></canvas><br />
+
+    <span id="spanResult1"></span><br /><br />
+
+    <br /><br /><br /><br />
+
+</body>
+</html>
