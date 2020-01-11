@@ -208,7 +208,11 @@
 
             var diff1, diff2, y1, y2, stepCount; 
 
-            diff1 = Try(x, y);
+            diff2 = Try(x, y);
+            if (!isNaN(diff2)) {
+
+                diff1 = diff2;
+            }
             y1 = y;
             stepCount = 0;
 
@@ -219,24 +223,32 @@
                 y2 = y + l;
 
                 diff2 = Try(x, y2);
-            
-                if (diff2 < diff1) {
 
-                    diff1 = diff2;
-                    y1 = y2;
-                    stepCount = i;
+                if (!isNaN(diff2)) {
+
+                    if (diff1 == undefined || diff2 < diff1) {
+
+                        diff1 = diff2;
+                        y1 = y2;
+                        stepCount = i;
+                    }
                 }
+                
 
                 y2 = y - l;
 
                 diff2 = Try(x, y2);
 
-                if (diff2 < diff1) {
+                if (!isNaN(diff2)) {
 
-                    diff1 = diff2;
-                    y1 = y2;
-                    stepCount = -i;
+                    if (diff1 == undefined || diff2 < diff1) {
+
+                        diff1 = diff2;
+                        y1 = y2;
+                        stepCount = -i;
+                    }
                 }
+                
             }
 
 
